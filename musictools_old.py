@@ -17,7 +17,7 @@ def setA4(frequency):
     global _A4
     _A4 = frequency
 
-_LETTERS = {"A":(0,0),"B":(1,2),"C":(2,3),"D":(3,5),"E":(4,7),"F":(5,8),"G":(6,10)}
+_LETTERS = {"C":(0,0),"D":(1,2),"E":(2,4),"F":(3,5),"G":(4,7),"A":(5,9),"B":(6,11)}
 
 _LETTER_IND = ("A","B","C","D","E","F","G")
 
@@ -218,12 +218,13 @@ class Note:
         else:
             return 0
         
+    #!WRONG SAD CHANGE FREQUENCY
     @property
     def frequency(self):
         global _A4
         if self.octave == None:
             raise AttributeError('Frequency value cannot be determined without an octave value for a Note')
-        offset = self.hard_pitch - 48
+        offset = self.hard_pitch - 56
         return _A4 * power(2,(offset/12))
 
     def __add__(self, other):
@@ -237,6 +238,10 @@ class Note:
         Subtract two Notes to return a descending Interval instance.
         """
         return Interval(self,other,descending=True)
+
+A4 = Note("A",octave=4)
+
+
 
 def get_note(pitch,letter):
     if pitch not in range(12):
@@ -280,7 +285,7 @@ def get_hard_note(hard_pitch,pref_sharp=True):
 
 def enharmonic(note_obj,gross_notes=False,prefer_sharp=False,prefer_flat=False):
     """
-    Give a note name (string) and receive an enharmonic equivalent.  
+    Give a Note object and receive an enharmonic equivalent.  
     
     Will not return any notes with more than one sharp or flat and will simplify any multi-sharp or flat note into a note with one or zero sharps or flats.  
     
