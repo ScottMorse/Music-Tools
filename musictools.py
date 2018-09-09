@@ -38,7 +38,7 @@ class Note:
     | The optional octave value should be an integer repsenting the standard octave numbering system.
     | 
     | For the name, use 'R' for rest or 'A','C#','Eb','F##','Gbbb', etc.
-    | Unlimited sharps and flats are permissible (though not always enocouraged)
+    | Unlimited sharps and flats are permissible (though not always encouraged)
     |
     | Values for rhythm start at 0 for a double whole note, and then 1 for whole, 2 for half, and so on up to 10 for a 512th note.  Print RHYTHM_SETTER_VALUES to view them all.
     |
