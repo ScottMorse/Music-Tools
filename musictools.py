@@ -17,19 +17,6 @@ def set_A4(Hz):
     global __A4
     __A4 = Hz
 
-RHYTHM_SETTER_VALUES = """    Double whole: 0
-    Whole: 1
-    Half: 2
-    Quarter: 3
-    8th: 4
-    16th: 5
-    32nd: 6
-    64th: 7
-    128th: 8
-    256th: 9
-    512th: 10
-"""
-
 class Note:
 
     """
@@ -40,11 +27,27 @@ class Note:
     | For the name, use 'R' for rest or 'A','C#','Eb','F##','Gbbb', etc.
     | Unlimited sharps and flats are permissible (though not always encouraged)
     |
-    | Values for rhythm start at 0 for a double whole note, and then 1 for whole, 2 for half, and so on up to 10 for a 512th note.  Print RHYTHM_SETTER_VALUES to view them all.
+    | Values for rhythm start at 0 for a double whole note, and then 1 for whole, 2 for half, and so on up to 10 for a 512th note.  Print Note.RHYTHM_SETTER_VALUES to view them all.
     |
     | Dots add a dot to the rhythm's value.
     |
     | Likewise, the triplet Boolean can set any rhythm as a 3:2 triplet.
+    """
+
+    class_name = "Note"
+
+    RHYTHM_SETTER_VALUES = """
+    Double whole: 0
+    Whole: 1
+    Half: 2
+    Quarter: 3
+    8th: 4
+    16th: 5
+    32nd: 6
+    64th: 7
+    128th: 8
+    256th: 9
+    512th: 10
     """
 
     __RHYTHM_VALUES = (
@@ -76,10 +79,9 @@ class Note:
 
     def __init__(self,name,octave=None,rhythm=0,dots=0,triplet=False):
 
-        name = name.strip().upper()
-
         if type(name) is not str:
             raise ValueError('Note name must be a string.')
+        name = name.strip().upper()
         if not match(Note.__NOTE_REGEX,name) and name != "R":
             raise ValueError('Invalid note name.')
         if type(octave) is not int:
@@ -149,7 +151,7 @@ class Note:
     def rhythm(self):
         """
         | Set the basic rhythm with an integer.  
-        View RHYTHM_SETTER_VALUES to see what number corresponds to which rhythm.
+        View Note.RHYTHM_SETTER_VALUES to see what number corresponds to which rhythm.
         |
         | Returns an object with three properties: name, size, and value
         |
@@ -159,6 +161,8 @@ class Note:
         | 
         | .rhtyhm.size does take into account dot and triplet settings.
         """
+        if not self.__rhythm: 
+            return None
         (__rhy_name,__rhy_size) = Note.__RHYTHM_VALUES[self.__rhythm]
         if self.dots:
             if self.dots > 1:
@@ -270,5 +274,87 @@ class Note:
         if self.is_rest:
             return None
         return len(self.__name)
+
+
+class Interval:
+
+    """
+    | Use this class to create Interval objects, or take advantage of its class methods.
+    | 
+    | 
+    | 
+    | 
+    | 
+    | 
+    | 
+    """
+
+    class_name = "Interval"
+
+    BASE_INTERVALS = {
+        "uni": 0,
+        "2nd": (1,2),
+        "3rd": (3,4),
+        "4th": 5,
+        "5th": 7,
+        "6th": (8,9),
+        "7th": (10,11),
+    }
+
+    __M_QUAL = ("2nd","3rd","6th","7th")
+
+    __QUALITY_REGEX = r'(maj|min|per)$|(aug|dim)[\d]*$'
+
+    __base_err = "Base interval must be a valid string. (see Interval.BASE_INTERVALS)"
+    __quality_err = "Quality must be 'maj','min','per','aug', or 'dim'.\n Augmented and diminished intervals may be increased by adding an integer, such as 'aug2' for doubly augmented."
+    __base_qual_err1 = "2nd/3rd/6th/7th cannot be perfect."
+    __base_qual_err2 = "uni/4th/5th cannot be major or minor."
+    __dir_err = "Direction must be 'a' for ascending or 'd' for descending."
+    __dis_err = "Displacement of octave must be an integer."
+
+    def __init__(self,quality,base,direction,displace=0):
+
+        if type(base) is not str:
+            raise ValueError(Interval.__base_err)
+        base = base.strip().lower()
+        if base not in Interval.BASE_INTERVALS:
+            raise ValueError(Interval.__base_err)
+        if type(quality) is not str:
+            raise ValueError(Interval.__quality_err)
+        quality = quality.strip().lower()
+        if not match(Interval.__QUALITY_REGEX,quality):
+            raise ValueError(Interval.__quality_err)
+        if quality in Interval.__M_QUAL and quality == "per":
+            raise ValueError(Interval.__base_qual_err1)
+        elif quality not in Interval.__M_QUAL and quality[0] == "m":
+            raise ValueError(Interval.__base_qual_err2)
+        if type(direction) is not str:
+            raise ValueError(Interval.__dir_err)
+        if direction != "a" and direction != "d":
+            raise ValueError(Interval.__dir_err)
+        if type(displace) is not int:
+            raise ValueError(Interval.__dis_err)
+
+    @property
+    def difference(self):
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
