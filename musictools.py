@@ -84,8 +84,9 @@ class Note:
         name = name.strip().upper()
         if not match(Note.__NOTE_REGEX,name) and name != "R":
             raise ValueError('Invalid note name.')
-        if type(octave) is not int:
-            raise ValueError('Octave value must be an integer.')
+        if octave != None:
+            if type(octave) is not int:
+                raise ValueError('Octave value must be an integer.')
         if rhythm not in range(11):
             raise ValueError('Rhythm value must be an integer between 0 and 10.')
         if type(dots) is not int:
@@ -291,7 +292,9 @@ class Interval:
 
     class_name = "Interval"
 
-    BASE_INTERVALS = {
+    BASE_INTERVALS: "uni, 2nd, 3rd, 4th, 5th, 6th, 7th"
+
+    __BASE_INTERVALS = {
         "uni": 0,
         "2nd": (1,2),
         "3rd": (3,4),
@@ -310,41 +313,164 @@ class Interval:
     __base_qual_err1 = "2nd/3rd/6th/7th cannot be perfect."
     __base_qual_err2 = "uni/4th/5th cannot be major or minor."
     __dir_err = "Direction must be 'a' for ascending or 'd' for descending."
-    __dis_err = "Displacement of octave must be an integer."
+    __dis_err = "Displacement of octave must be a positive integer."
 
-    def __init__(self,quality,base,direction,displace=0):
+    def __init__(self,quality,base,direction=None,displace=0):
 
         if type(base) is not str:
             raise ValueError(Interval.__base_err)
         base = base.strip().lower()
-        if base not in Interval.BASE_INTERVALS:
+        if base not in Interval.__BASE_INTERVALS:
             raise ValueError(Interval.__base_err)
         if type(quality) is not str:
             raise ValueError(Interval.__quality_err)
         quality = quality.strip().lower()
         if not match(Interval.__QUALITY_REGEX,quality):
             raise ValueError(Interval.__quality_err)
-        if quality in Interval.__M_QUAL and quality == "per":
+        if base in Interval.__M_QUAL and quality == "per":
             raise ValueError(Interval.__base_qual_err1)
-        elif quality not in Interval.__M_QUAL and quality[0] == "m":
+        elif base not in Interval.__M_QUAL and quality[0] == "m":
             raise ValueError(Interval.__base_qual_err2)
-        if type(direction) is not str:
-            raise ValueError(Interval.__dir_err)
-        if direction != "a" and direction != "d":
-            raise ValueError(Interval.__dir_err)
+        if direction != None:
+            if type(direction) is not str:
+                raise ValueError(Interval.__dir_err)
+            if direction != "a" and direction != "d":
+                raise ValueError(Interval.__dir_err)
         if type(displace) is not int:
             raise ValueError(Interval.__dis_err)
+        if displace < 0:
+            raise ValueError(Interval.__dis_err)
+        
+        self.__quality = quality
+        self.__base = base
+        self.__direction = direction
+        self.__displace = displace
+
+    @property
+    def quality(self):
+        """The quality given for the interval (str)"""
+        return self.__quality
+
+    @property
+    def base(self):
+        """The base interval given for the interval (str)"""
+        return self.__base
+
+    @property
+    def direction(self):
+        """The direction given for the interval ('a' ascending, 'd' descending)"""
+        return self.__direction
+    
+    @direction.setter
+    def direction(self,value):
+        if value != None:
+            if type(value) is not str:
+                raise ValueError(Interval.__dir_err)
+            if value != "a" and value != "d":
+                raise ValueError(Interval.__dir_err)
+        self.__direction = value
+    
+    @property
+    def displace(self):
+        """The given number of octaves displaced (int)"""
+        return self.__displace
 
     @property
     def difference(self):
+        """Returns the difference in pitch of the interval measured in half steps (int)"""
+        if self.quality == "per":
+            return Interval.__BASE_INTERVALS[self.base] + 12 * self.displace
+        if self.quality == "min":
+            return Interval.__BASE_INTERVALS[self.base][0] + 12 * self.displace
+        if self.quality == "maj":
+            return Interval.__BASE_INTERVALS[self.base][1] + 12 * self.displace
+        if self.quality[:3] == "aug":
+            if len(self.quality) > 3:
+                more = int(self.quality[3:]) if self.quality[3:] != "0" else 1
+            else:
+                more = 1
+            if self.base in Interval.__M_QUAL:
+                return Interval.__BASE_INTERVALS[self.base][1] + more + 12 * self.displace
+            else:
+                return Interval.__BASE_INTERVALS[self.base] + more + 12 * self.displace
+        elif self.quality[:3] == "dim":
+            if len(self.quality) > 3:
+                less = int(self.quality[3:]) if self.quality[3:] != "0" else 1
+            else:
+                less = 1
+            if self.base in Interval.__M_QUAL:
+                return Interval.__BASE_INTERVALS[self.base][0] - less + 12 * self.displace
+            else:
+                return Interval.__BASE_INTERVALS[self.base] - less + 12 * self.displace
+    
+    @property
+    def name(self):
+        """A name for the interval more pleasing to the eye (str)"""
+        if self.base == "uni" and self.quality == "per" and self.displace > 1:
+            return f"{self.displace} octaves"
+        if self.displace == 1:
+            if self.base == "uni":
+                base = "octave"
+            else:
+                base = str(int(self.base[0]) + 7) + "th"
+        elif self.base == "uni":
+            base = "unison"
+        else:
+            base = self.base
+        if self.quality == "maj":
+            quality = "Major"
+        elif self.quality == "min":
+            quality = "Minor"
+        elif self.quality == "per":
+            quality = "Perfect"
+        elif self.quality[:3] == "aug":
+            quality = "Augmented"
+        else:
+            quality = "Diminished"
+        if len(self.quality) > 3:
+            times = f"(x{self.quality[3:]})"
+        else:
+            times = ""
+        name = quality + times + " " + base
+        if self.displace > 1:
+            name += f" plus {self.displace} octaves"
+        return name
         
-
-
-
-
-
-
-
+    __SIMPLE_INTVLS = (
+        ("per","uni"),
+        ("min","2nd"),
+        ("maj","2nd"),
+        ("min","3rd"),
+        ("maj","3rd"),
+        ("per","4th"),
+        ("aug","4th"),
+        ("per","5th"),
+        ("min","6th"),
+        ("maj","6th"),
+        ("min","7th"),
+        ("maj","7th"),
+        )
+    
+    @classmethod
+    def from_notes(self,note_obj1,note_obj2,simple=None):
+        """
+        | Return an interval object measured between two Note objects.
+        | Set simple to 'a'(ascend) or 'd'(descend) to calculate an interval 
+        that is calculated independant of octave value or strict enharmonic naming.
+        | Otherwise, both Note objects (see Note class) must have octave values.
+        """
+        try:
+            assert note_obj1.class_name == "Note" and note_obj2.class_name == "Note"
+        except:
+            raise ValueError("Arguments must be Note objects")
+        if simple:
+            if simple != "a" and simple != "d":
+                raise ValueError("Set simple only to 'a' for ascending or 'd' for descending.")
+            if simple == 'a':
+                pitch_diff = note_obj2.pitch - note_obj1.pitch
+            else:
+                pitch_diff = note_obj1.pitch - note_obj2.pitch
+            return Interval(Interval.__SIMPLE_INTVLS[pitch_diff][0],Interval.__SIMPLE_INTVLS[pitch_diff][1])
 
 
 
