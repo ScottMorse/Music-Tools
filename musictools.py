@@ -402,6 +402,17 @@ class Note(_Meta):
                     return Note(Note.__PITCH_VALUES[index + 1][0] + "b",octave=octave)
                 return Note(note[0] + "#",octave=octave)
             index += 1
+    
+    @classmethod
+    def from_frequency(self,Hz):
+        if type(Hz) is not int and type(Hz) is not float:
+            raise ValueError("Please provide a positive number for the Hz value.")
+        if Hz < 0:
+            raise ValueError("Please provide a positive number for the Hz value.")
+        return Note.from_hard_pitch(int(round(12 * (log2(Hz) - log2(get_A4()))) + 57))
+    
+frequency_note = Note.from_frequency(220)
+print(frequency_note.name)
 
 class Interval(_Meta):
 
