@@ -76,17 +76,16 @@ class Note(_Meta):
         ("256th", 2),
         ("512th", 1),
     )
-            
-    __PITCH_VALUES = {
-        'C': (0,0),
-        'D': (2,1),
-        'E': (4,2),
-        'F': (5,3),
-        'G': (7,4),
-        'A': (9,5),
-        'B': (11,6),
-        'R': (None, None)
-    }
+
+    __PITCH_VALUES = (
+        ("C",0),
+        ("D",2),
+        ("E",4),
+        ("F",5),
+        ("G",7),
+        ("A",9),
+        ("B",11),
+    )
 
     __NOTE_REGEX = r'[A-G](#|b)*$'
 
@@ -100,7 +99,7 @@ class Note(_Meta):
             if type(octave) is not int:
                 raise ValueError('Octave value must be an integer.')
         if rhythm not in range(11):
-            raise ValueError('Rhythm value must be an integer between 0 and 10.')
+            raise ValueError('Rhythm value must be an integer between 0 and 10. See Note.RHYTHM_SETTER_VALUES')
         if type(dots) is not int:
             raise ValueError('Dot value must be a positive integer or 0.')
         if dots < 0:
@@ -134,8 +133,8 @@ class Note(_Meta):
     def octave(self,value):
         if self.is_rest:
             raise ValueError("Cannot set an octave value for a rest.")
-        if type(value) is not int:
-            raise ValueError('Octave value must be an integer.')
+        if type(value) is not int and value != None:
+            raise ValueError('Octave value must be an integer or None.')
         self.__octave = value
 
     @property
@@ -194,7 +193,7 @@ class Note(_Meta):
 
     @rhythm.setter
     def rhythm(self,value):
-        if value not in range(11):
+        if value not in range(11) and value != None:
             raise ValueError('Rhythm value must be set with an integer between 0 and 10.')
         self.__rhythm = value
 
@@ -212,9 +211,20 @@ class Note(_Meta):
         return name
     
     @property
+    def note_name(self):
+        """Only the name of the note (letter and sharps/flats), without any other description"""
+        return self.__name
+
+    @property
     def letter(self):
         """An integer representing the alphabetical letter of the note, C starting with 0 up to 6 for B"""
-        return Note.__PITCH_VALUES[self.__name[0]][1]
+        i = 0
+        for note in Note.__PITCH_VALUES:
+            if self.__name[0] == note[0]:
+                return i
+            i += 1
+        else:
+            return None
 
     @property
     def sharps(self):
@@ -239,7 +249,9 @@ class Note(_Meta):
         """Represents a relative value for a Note's pitch.  Any equivalent of C natural is 0, up to 11 for an equivalent of B natural."""
         if self.is_rest:
             return None
-        pitch = Note.__PITCH_VALUES[self.__name[0]][0]
+        for note in Note.__PITCH_VALUES:
+            if self.__name[0] == note[0]:
+                pitch = note[1]
         if self.sharps:
             pitch += self.sharps
             if pitch > 11:
@@ -285,10 +297,72 @@ class Note(_Meta):
         offset = self.hard_pitch - 57
         return get_A4() * power(2,(offset/12))
     
+    __GROSS_ROOTS = {"B":"Cb","C":"B#","E":"Fb","F":"E#"}
+    __NON_NATURAL = (1,3,6,8,10)
     def enharmonic(self,prefer=None, gross=False):
-        return 1
+        """
+        | Return an enharmonic version of the note.
+        | Does not change the original object.
+        | 'gross' set to True allows B to convert to Cb, E to Fb, C to B#, F to E#.
+        | Set 'prefer' to '#' or 'b' to force a return of only a certian enharmonic.
+        | Multiple sharps/flats will reduce to 1 or 0.
+        | Preserves the original object's octave and rhythm
+        """
+        if self.pitch == None:
+            raise Exception("'enharmonic' is unusable on a rest.")
+        if prefer:
+            if prefer not in ("#","b"):
+                raise ValueError("Set prefer to '#' or 'b'.")
+        if type(gross) is not bool:
+            raise ValueError("'gross' must be Boolean.")
+        if gross and self.note_name in Note.__GROSS_ROOTS:
+            new_name = Note.__GROSS_ROOTS[self.note_name]
+            if "#" in new_name and prefer == 'b':
+                return self
+            elif 'b' in new_name and prefer == '#':
+                return self
+            else:
+                new_note = Note(new_name)
+        elif len(self.note_name) == 1:
+            return self
+        elif len(self.note_name) == 2:
+            if "#" in self.note_name:
+                if prefer == '#':
+                    return self
+                new_letter = self.letter + 1
+                if new_letter > 6:
+                    new_letter -= 7
+            else:
+                if prefer == 'b':
+                    return self
+                new_letter = self.letter - 1
+                if new_letter < 0:
+                    new_letter += 7
+            new_note = Note.from_values(new_letter,self.pitch)
+        else:
+            new_note = self
+            new_letter = self.letter
+            limit = 2 if self.pitch in Note.__NON_NATURAL else 1
+            while len(new_note.note_name) > limit:
+                if "#" in self.note_name:
+                    new_letter += 1
+                    if new_letter > 6:
+                        new_letter -= 7
+                else:
+                    new_letter -= 1
+                    if new_letter < 0:
+                        new_letter += 7
+                new_note = Note.from_values(new_letter,self.pitch)
+            if "#" in new_note.name and prefer == "b":
+                new_note = Note.from_values(new_letter + 1, self.pitch)
+            elif "b" in new_note.name and prefer == "#":
+                new_note = Note.from_values(new_letter - 1, self.pitch)
+        new_note.octave = self.octave
+        new_note.rhythm = self.rhythm
+        new_note.dots = self.dots
+        new_note.triplet = self.triplet
+        return new_note
 
-    __SIMPLE_NOTES = (("C",0),("D",2),("E",4),("F",5),("G",7),("A",9),("B",11))
     @classmethod
     def from_values(self,letter,pitch):
         """Returns a Note object matching the values for 'letter' and 'pitch' given (no octave value given)."""
@@ -296,7 +370,7 @@ class Note(_Meta):
             raise ValueError("Letter argument should be an integer between 0 and 6, 0 for C, 1 for B, etc.")
         if pitch not in range(12):
             raise ValueError("Pitch argument should be an integer between 0 and 11, 0 for C natural (or equivalent), 1 for C#/Db, etc.")
-        note_values = Note.__SIMPLE_NOTES[letter]
+        note_values = Note.__PITCH_VALUES[letter]
         letter_str = note_values[0]
         expected_pitch = note_values[1]
         pitch_offset = pitch - expected_pitch
@@ -320,15 +394,14 @@ class Note(_Meta):
         octave = hard_pitch // 12
         pitch = hard_pitch % 12
         index = 0
-        for note in Note.__SIMPLE_NOTES:
+        for note in Note.__PITCH_VALUES:
             if pitch == note[1]:
                 return Note(note[0],octave=octave)
             if pitch == note[1] + 1:
                 if prefer_flat:
-                    return Note(Note.__SIMPLE_NOTES[index + 1][0] + "b",octave=octave)
+                    return Note(Note.__PITCH_VALUES[index + 1][0] + "b",octave=octave)
                 return Note(note[0] + "#",octave=octave)
             index += 1
-
 
 class Interval(_Meta):
 
@@ -525,7 +598,7 @@ class Interval(_Meta):
             return Interval(Interval.__SIMPLE_INTVLS[pitch_diff][0],Interval.__SIMPLE_INTVLS[pitch_diff][1])
 
         if not note_obj1.octave or not note_obj2.octave:
-            raise ValueError("Interval cannot be determined for Notes with no octave values, unless 'simple' paramater is set.")
+            raise ValueError("Interval cannot be determined for Notes with no octave values, unless 'simple' parameter is set.")
         
         if note_obj2.hard_pitch > note_obj1.hard_pitch:
             higher = note_obj2
