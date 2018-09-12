@@ -17,10 +17,23 @@ def set_A4(Hz):
     global __A4
     __A4 = Hz
 
-class Note:
+class _Meta:
+    __locked = False
+    __RESTRICTED = (
+        "enharmonic",
+    )
+    def __setattr__(self, name, value):
+        if self.__locked and name not in dir(self) or name in _Meta.__RESTRICTED or name.startswith("__"):
+            raise AttributeError(f"Cannot set attribute '{name}'.")
+        object.__setattr__(self, name, value)
+
+    def _lock(self):
+        self.__locked = True
+
+class Note(_Meta):
 
     """
-    |  Create an object that represents a pitched note or rest.
+    |  Create an object that represents a pitched note or rest.  Also see class methods.
     |
     | The optional octave value should be an integer repsenting the standard octave numbering system.
     | 
@@ -78,10 +91,9 @@ class Note:
     __NOTE_REGEX = r'[A-G](#|b)*$'
 
     def __init__(self,name,octave=None,rhythm=0,dots=0,triplet=False):
-
         if type(name) is not str:
             raise ValueError('Note name must be a string.')
-        name = name.strip().upper()
+        name = name.strip().capitalize()
         if not match(Note.__NOTE_REGEX,name) and name != "R":
             raise ValueError('Invalid note name.')
         if octave != None:
@@ -101,6 +113,8 @@ class Note:
         self.__rhythm = rhythm
         self.__dots = dots
         self.__triplet = triplet
+
+        self._lock()
 
     @property
     def is_rest(self):
@@ -270,14 +284,53 @@ class Note:
             return None
         offset = self.hard_pitch - 57
         return get_A4() * power(2,(offset/12))
+    
+    def enharmonic(self,prefer=None, gross=False):
+        return 1
 
-    def __len__(self):
-        if self.is_rest:
-            return None
-        return len(self.__name)
+    __SIMPLE_NOTES = (("C",0),("D",2),("E",4),("F",5),("G",7),("A",9),("B",11))
+    @classmethod
+    def from_values(self,letter,pitch):
+        """Returns a Note object matching the values for 'letter' and 'pitch' given (no octave value given)."""
+        if letter not in range(7):
+            raise ValueError("Letter argument should be an integer between 0 and 6, 0 for C, 1 for B, etc.")
+        if pitch not in range(12):
+            raise ValueError("Pitch argument should be an integer between 0 and 11, 0 for C natural (or equivalent), 1 for C#/Db, etc.")
+        note_values = Note.__SIMPLE_NOTES[letter]
+        letter_str = note_values[0]
+        expected_pitch = note_values[1]
+        pitch_offset = pitch - expected_pitch
+        if pitch_offset > 5:
+            pitch_offset -= 12
+        elif pitch_offset < -6:
+            pitch_offset += 12
+        if pitch_offset == 0:
+            return Note(letter_str)
+        if pitch_offset < 0:
+            return Note(letter_str + "b" * (-1 * pitch_offset))
+        return Note(letter_str + "#" * pitch_offset)
+
+    @classmethod
+    def from_hard_pitch(self,hard_pitch,prefer_flat=False):
+        """
+        | Returns a Note object (octave valued) matching a hard pitch value.
+        | Hard pitch starts at 0 for C0, and increases or decreases per half step.
+        | Will return a sharp note unless prefer_flat is set to True
+        """
+        octave = hard_pitch // 12
+        pitch = hard_pitch % 12
+        index = 0
+        for note in Note.__SIMPLE_NOTES:
+            if pitch == note[1]:
+                return Note(note[0],octave=octave)
+            if pitch == note[1] + 1:
+                if prefer_flat:
+                    return Note(Note.__SIMPLE_NOTES[index + 1][0] + "b",octave=octave)
+                return Note(note[0] + "#",octave=octave)
+            index += 1
 
 
-class Interval:
+class Interval(_Meta):
 
     """
     | Use this class to create Interval objects, or take advantage of its class methods.
@@ -292,14 +345,14 @@ class Interval:
 
     class_name = "Interval"
 
-    BASE_INTERVALS: "uni, 2nd, 3rd, 4th, 5th, 6th, 7th"
+    BASES = ("uni", "2nd", "3rd", "4th", "5th", "6th", "7th")
 
     __BASE_INTERVALS = {
-        "uni": 0,
+        "uni": (0,),
         "2nd": (1,2),
         "3rd": (3,4),
-        "4th": 5,
-        "5th": 7,
+        "4th": (5,),
+        "5th": (7,),
         "6th": (8,9),
         "7th": (10,11),
     }
@@ -308,7 +361,7 @@ class Interval:
 
     __QUALITY_REGEX = r'(maj|min|per)$|(aug|dim)[\d]*$'
 
-    __base_err = "Base interval must be a valid string. (see Interval.BASE_INTERVALS)"
+    __base_err = "Base interval must be a valid string. (see Interval.BASES)"
     __quality_err = "Quality must be 'maj','min','per','aug', or 'dim'.\n Augmented and diminished intervals may be increased by adding an integer, such as 'aug2' for doubly augmented."
     __base_qual_err1 = "2nd/3rd/6th/7th cannot be perfect."
     __base_qual_err2 = "uni/4th/5th cannot be major or minor."
@@ -346,6 +399,8 @@ class Interval:
         self.__direction = direction
         self.__displace = displace
 
+        self._lock()
+
     @property
     def quality(self):
         """The quality given for the interval (str)"""
@@ -378,9 +433,7 @@ class Interval:
     @property
     def difference(self):
         """Returns the difference in pitch of the interval measured in half steps (int)"""
-        if self.quality == "per":
-            return Interval.__BASE_INTERVALS[self.base] + 12 * self.displace
-        if self.quality == "min":
+        if self.quality == "per" or self.quality == "min":
             return Interval.__BASE_INTERVALS[self.base][0] + 12 * self.displace
         if self.quality == "maj":
             return Interval.__BASE_INTERVALS[self.base][1] + 12 * self.displace
@@ -392,16 +445,13 @@ class Interval:
             if self.base in Interval.__M_QUAL:
                 return Interval.__BASE_INTERVALS[self.base][1] + more + 12 * self.displace
             else:
-                return Interval.__BASE_INTERVALS[self.base] + more + 12 * self.displace
+                return Interval.__BASE_INTERVALS[self.base][0] + more + 12 * self.displace
         elif self.quality[:3] == "dim":
             if len(self.quality) > 3:
                 less = int(self.quality[3:]) if self.quality[3:] != "0" else 1
             else:
                 less = 1
-            if self.base in Interval.__M_QUAL:
-                return Interval.__BASE_INTERVALS[self.base][0] - less + 12 * self.displace
-            else:
-                return Interval.__BASE_INTERVALS[self.base] - less + 12 * self.displace
+            return Interval.__BASE_INTERVALS[self.base][0] - less + 12 * self.displace
     
     @property
     def name(self):
@@ -459,10 +509,12 @@ class Interval:
         that is calculated independant of octave value or strict enharmonic naming.
         | Otherwise, both Note objects (see Note class) must have octave values.
         """
+
         try:
             assert note_obj1.class_name == "Note" and note_obj2.class_name == "Note"
         except:
             raise ValueError("Arguments must be Note objects")
+
         if simple:
             if simple != "a" and simple != "d":
                 raise ValueError("Set simple only to 'a' for ascending or 'd' for descending.")
@@ -472,11 +524,49 @@ class Interval:
                 pitch_diff = note_obj1.pitch - note_obj2.pitch
             return Interval(Interval.__SIMPLE_INTVLS[pitch_diff][0],Interval.__SIMPLE_INTVLS[pitch_diff][1])
 
+        if not note_obj1.octave or not note_obj2.octave:
+            raise ValueError("Interval cannot be determined for Notes with no octave values, unless 'simple' paramater is set.")
+        
+        if note_obj2.hard_pitch > note_obj1.hard_pitch:
+            higher = note_obj2
+            lower = note_obj1
+            direction = 'a'
+        else:
+            higher = note_obj1
+            lower = note_obj2
+            direction = 'b'
 
+        letter_diff = higher.letter - lower.letter
+        pitch_diff = higher.hard_pitch - lower.hard_pitch
 
+        base = Interval.BASES[letter_diff]
+        expect = Interval.__BASE_INTERVALS[base]
 
+        displace = pitch_diff // 12
+        pitch_diff %= 12
 
-
+        if pitch_diff in expect:
+            if len(expect) == 2:
+                if pitch_diff == expect[0]:
+                    quality = "min"
+                elif pitch_diff == expect[1]:
+                    quality = "maj"
+            else:
+                if pitch_diff == expect[0]:
+                    quality = "per"
+        else:
+            if len(expect) == 2 and pitch_diff > expect[1]:
+                aug = True
+                offset = pitch_diff - expect[1]
+            else:
+                aug = True if pitch_diff > expect[0] else False
+                offset = pitch_diff - expect[0] if aug else expect[0] - pitch_diff
+            if offset == 1:
+                quality = "aug" if aug else "dim"
+            else:
+                quality = f"aug{offset}" if aug else f"dim{offset}"
+        
+        return Interval(quality,base,direction=direction,displace=displace)
 
 
 
