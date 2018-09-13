@@ -1054,5 +1054,5 @@ class Chord(_Meta):
     
     @property
     def notes(self):
-        """A tuple containing all the notes of the Chord."""
+        """A tuple containing all the Note objects of the Chord."""
         return self._notes
