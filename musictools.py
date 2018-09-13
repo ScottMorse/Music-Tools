@@ -9,8 +9,7 @@ def get_A4():
     return __A4
 
 def set_A4(Hz):
-    user_type = type(Hz)
-    if user_type is not int and user_type is not float:
+    if type(Hz) is not int and type(Hz) is not float:
         raise ValueError('Hz value for A4 must be a positive number.')
     if Hz <= 0:
         raise ValueError('Hz value for A4 must be a positive number.')
@@ -252,6 +251,7 @@ class Note(_Meta):
         for note in Note.__PITCH_VALUES:
             if self.__name[0] == note[0]:
                 pitch = note[1]
+                break
         if self.sharps:
             pitch += self.sharps
             if pitch > 11:
@@ -299,6 +299,7 @@ class Note(_Meta):
     
     __GROSS_ROOTS = {"B":"Cb","C":"B#","E":"Fb","F":"E#"}
     __NON_NATURAL = (1,3,6,8,10)
+
     def enharmonic(self,prefer=None, gross=False):
         """
         | Return an enharmonic version of the note.
@@ -358,10 +359,96 @@ class Note(_Meta):
             elif "b" in new_note.name and prefer == "#":
                 new_note = Note.from_values(new_letter - 1, self.pitch)
         new_note.octave = self.octave
-        new_note.rhythm = self.rhythm
+        if self.rhythm:
+            new_note.rhythm = self.rhythm.value
         new_note.dots = self.dots
         new_note.triplet = self.triplet
+        
         return new_note
+
+    @classmethod
+    def sorter_by_hard_pitch(self,note_object):
+        """
+        | A function that can be used for in a sort function.
+        | Cannot be used for Notes with no octave values.
+        """
+        if note_object.octave == None:
+            raise ValueError("Can't sort Notes without octave values by hard pitch.")
+        return note_object.hard_pitch
+    
+    def sorter_from_root(self,note_object):
+        """
+        | A function that can be used for in a sort function.
+        | Used as a method from a specific object to act as the root.
+        | Sorts notes like a scale ascending from a root.
+        """
+        if note_object.pitch < self.pitch:
+            return note_object.pitch + 12
+        return note_object.pitch
+
+
+    def __add__(self,interval):
+        """Add an Interval object to a Note to return the note ascended from that interval."""
+        try:
+            assert interval.class_name == "Interval"
+        except:
+            raise ValueError("__add__ method for Note requires an Interval object.")
+
+        letter = self.letter + interval.letter_difference
+        if letter > 6:
+            letter -= 7
+
+        if self.octave:
+            pitch = self.hard_pitch + interval.difference
+            new_note = Note.from_hard_pitch(pitch)
+            if new_note.letter != letter:
+                new_note = new_note.enharmonic()
+        else:
+            pitch = self.pitch + interval.difference
+            if interval.displace > 0:
+                pitch -= interval.displace * 12
+            if pitch > 11:
+                pitch -= 12
+            new_note = Note.from_values(letter,pitch)
+
+        if self.rhythm:
+            new_note.rhythm = self.rhythm.value
+        new_note.dots = self.dots
+        new_note.triplet = self.triplet
+
+        return new_note
+    
+    def __sub__(self,interval):
+        """Subtract an Interval object to a Note to return the note descended from that interval."""
+        try:
+            assert interval.class_name == "Interval"
+        except:
+            raise ValueError("__add__ method for Note requires an Interval object.")
+
+        letter = self.letter - interval.letter_difference
+        if letter < 0:
+            letter += 7
+
+        if self.octave:
+            pitch = self.hard_pitch - interval.difference
+            new_note = Note.from_hard_pitch(pitch)
+            if new_note.letter != letter:
+                new_note = new_note.enharmonic()
+        else:
+            pitch = self.pitch - interval.difference
+            if interval.displace > 0:
+                pitch -= interval.displace * 12
+            if pitch < 0:
+                pitch += 12
+            new_note = Note.from_values(letter,pitch)
+
+        if self.rhythm:
+            new_note.rhythm = self.rhythm.value
+        new_note.dots = self.dots
+        new_note.triplet = self.triplet
+
+        return new_note
+        
 
     @classmethod
     def from_values(self,letter,pitch):
@@ -416,6 +503,8 @@ class Note(_Meta):
         return Note.from_hard_pitch(int(round(12 * (log2(Hz) - log2(get_A4()))) + 57))
     
 class Interval(_Meta):
+
+    class_name = "Interval"
 
     """
     | Use this class to create Interval objects, or take advantage of its class methods.
@@ -517,6 +606,12 @@ class Interval(_Meta):
                 less = 1
             return Interval.__BASE_INTERVALS[self.base][0] - less + 12 * self.displace
     
+    @property
+    def letter_difference(self):
+        """The number of note letter degrees changed by the interval."""
+        return Interval.BASES.index(self.base)
+
+
     @property
     def name(self):
         """A name for the interval more pleasing to the eye (str)"""
@@ -674,6 +769,8 @@ MODE_LETTER_SPELLINGS = {
 
 class Mode(_Meta):
 
+    class_name = "Mode"
+
     """
     | Create a Mode
     | Use a Note object for the 'root' and a string for the 'mode'.
@@ -792,7 +889,170 @@ class Mode(_Meta):
         
         return tuple(string_spelling)
 
+EXTENSIONS = {
+    "b9": ("min","2nd"),
+    "addb9": ("min","2nd"),
+    "2": ("maj","2nd"),
+    "9": ("maj","2nd"),
+    "add9": ("maj","2nd"),
+    "#9": ("aug","2nd"),
+    "add4": ("per","4th"),
+    "add11": ("per","4th"),
+    "#11": ("aug","4th"),
+    "b5": ("dim","5th"),
+    "#5": ("aug","5th"),
+    "b6": ("min","6th"),
+    "b13": ("min","6th"),
+    "6": ("maj","6th"),
+    "13": ("maj","6th"),
+    "dim7": ("dim","7th"),
+    "7": ("min","7th"),
+    "maj7": ("maj","7th"),
+}
+
+QUALITIES = (
+    "maj",
+    "min",
+    "aug",
+    "dim",
+    "sus",
+    "5",
+)
 
 class Chord(_Meta):
 
+    """
+    | Create a Chord from a root Note, quality, and extensions.
+    | Pass extensions (str) as args.  Check out EXTENSIONS's keys for valid input.
+    | For 'quality', use 'maj','min','aug','dim','sus',or '5'.
+    | Keep in mind that some extensions imply and automatically add others (like 13).
+    | Uncommon, strange, repetitious, or ridiculous combinations of extensions might not work as expected.
+    """
 
+    def __init__(self,root,quality,*extensions):
+
+        try:
+            assert root.class_name == "Note"
+        except:
+            raise ValueError("Root of a Chord must be a Note object.")
+        if quality not in QUALITIES:
+            raise ValueError("Invalid chord quality. (use 'maj','min','aug','dim','sus',or'5')")
+        for extension in extensions:
+            if extension not in EXTENSIONS:
+                raise ValueError("Invalid extension.  See EXTENSIONS dictionary.")
+        
+        self._root = root
+        self._quality = quality
+        self._extensions = extensions
+        notes = [root]
+        dictionary = {}
+
+        if self.quality == "maj":
+            third = Interval("maj","3rd")
+            fifth = Interval("per","5th")
+        elif self.quality == "min":
+            third = Interval("min","3rd")
+            fifth = Interval("per","5th")
+        elif self.quality == "aug":
+            third = Interval("maj","3rd")
+            fifth = Interval("aug","5th")
+        elif self.quality == "dim":
+            third = Interval("min","3rd")
+            fifth = Interval("dim","5th")
+        elif self.quality == "sus":
+            third = Interval("per","4th")
+            fifth = Interval("per","5th")
+        else:
+            third = None
+            fifth = Interval("per","5th")
+        if third:
+            dictionary["third"] = third
+        dictionary["fifth"] = fifth
+
+        need7 = False
+        need9 = False
+        for ext13 in ("13","b13"):
+            if ext13 in extensions:
+                dictionary["13th"] = Interval(*EXTENSIONS[ext13])
+                need7 = True
+                need9 = True
+                break
+        for ext9 in ("9","#9","b9"):
+            if ext9 in extensions:
+                dictionary["9th"] = Interval(*EXTENSIONS[ext9])
+                need7 = True
+                need9 = False
+                break
+        else:
+            if need9:
+                dictionary["9th"] = Interval("maj","2nd")
+
+        for ext7 in ("7","maj7","dim7"):
+            if ext7 in extensions:
+                dictionary["7th"] = Interval(*EXTENSIONS[ext7])
+                need7 = False
+                break
+        else:
+            if need7:
+                if quality == "dim":
+                    dictionary["7th"] = Interval("maj","6th")
+                else:
+                    dictionary["7th"] = Interval("min","7th")
+        for ext2 in ("2","addb9","add9"):
+            if ext2 in extensions:
+                dictionary["2nd"] = Interval(*EXTENSIONS[ext2])
+                break
+        
+        for ext5 in ("b5","#5"):
+            if ext5 in extensions:
+                dictionary["fifth"] = Interval(*EXTENSIONS[ext5])
+
+        for ext in ("addb9","add9","2","add4","#11","b6","6"):
+            if ext in extensions:
+                dictionary[ext] = Interval(*EXTENSIONS[ext])
+        
+
+        for intvl in dictionary:
+            note = root + dictionary[intvl]
+            notes.append(note)
+        
+
+        notes.sort(key=root.sorter_from_root)
+        previous_note = root
+        first = True
+        for note in notes:
+            if first:
+                first = False
+                continue
+            if previous_note.pitch == note.pitch:
+                notes.remove(note)
+            previous_note = note
+        
+        self._dictionary = dictionary
+        self._notes = tuple(notes)
+        self._lock()
+    
+    @property
+    def root(self):
+        """The Note that was given as the root."""
+        return self._root
+    
+    @property
+    def quality(self):
+        """The quality that was given at initialization."""
+        return self._quality
+    
+    @property
+    def extensions(self):
+        """The extensions given at initialization."""
+        return self._extensions
+
+    @property
+    def dictionary(self):
+        """A dictionary of chord tones and their respective Intervals."""
+        return self._dictionary
+    
+    @property
+    def notes(self):
+        """A tuple containing all the notes of the Chord."""
+        return self._notes
