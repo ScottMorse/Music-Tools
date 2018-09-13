@@ -273,7 +273,7 @@ class Note(_Meta):
             return -self.flats
         else:
             return 0
-    
+
     @property
     def hard_pitch(self):
         """
@@ -391,6 +391,10 @@ class Note(_Meta):
         | Hard pitch starts at 0 for C0, and increases or decreases per half step.
         | Will return a sharp note unless prefer_flat is set to True
         """
+        if type(hard_pitch) is not int:
+            raise ValueError("Hard pitch argument must be an integer.")
+        if type(prefer_flat) is not bool:
+            raise ValueError("prefer_flat must be Boolean.")
         octave = hard_pitch // 12
         pitch = hard_pitch % 12
         index = 0
@@ -407,24 +411,21 @@ class Note(_Meta):
     def from_frequency(self,Hz):
         if type(Hz) is not int and type(Hz) is not float:
             raise ValueError("Please provide a positive number for the Hz value.")
-        if Hz < 0:
+        if Hz <= 0:
             raise ValueError("Please provide a positive number for the Hz value.")
         return Note.from_hard_pitch(int(round(12 * (log2(Hz) - log2(get_A4()))) + 57))
     
-frequency_note = Note.from_frequency(220)
-print(frequency_note.name)
-
 class Interval(_Meta):
 
     """
     | Use this class to create Interval objects, or take advantage of its class methods.
     | 
+    | For the 'quality', use "maj"(major), "min"(minor), "per"(perfect), "aug"(augmented), or "dim"(diminished).
     | 
+    | For the 'base', use "uni"(unison),"2nd","3rd","4th", and so on up to "7th."
     | 
-    | 
-    | 
-    | 
-    | 
+    | Set 'displace' to a number to displace an interval by a number of octaves.
+    | For example, a unison that is displaced by 1 is the same as a perfect octave.
     """
 
     class_name = "Interval"
@@ -449,10 +450,9 @@ class Interval(_Meta):
     __quality_err = "Quality must be 'maj','min','per','aug', or 'dim'.\n Augmented and diminished intervals may be increased by adding an integer, such as 'aug2' for doubly augmented."
     __base_qual_err1 = "2nd/3rd/6th/7th cannot be perfect."
     __base_qual_err2 = "uni/4th/5th cannot be major or minor."
-    __dir_err = "Direction must be 'a' for ascending or 'd' for descending."
     __dis_err = "Displacement of octave must be a positive integer."
 
-    def __init__(self,quality,base,direction=None,displace=0):
+    def __init__(self,quality,base,displace=0):
 
         if type(base) is not str:
             raise ValueError(Interval.__base_err)
@@ -468,11 +468,6 @@ class Interval(_Meta):
             raise ValueError(Interval.__base_qual_err1)
         elif base not in Interval.__M_QUAL and quality[0] == "m":
             raise ValueError(Interval.__base_qual_err2)
-        if direction != None:
-            if type(direction) is not str:
-                raise ValueError(Interval.__dir_err)
-            if direction != "a" and direction != "d":
-                raise ValueError(Interval.__dir_err)
         if type(displace) is not int:
             raise ValueError(Interval.__dis_err)
         if displace < 0:
@@ -480,7 +475,6 @@ class Interval(_Meta):
         
         self.__quality = quality
         self.__base = base
-        self.__direction = direction
         self.__displace = displace
 
         self._lock()
@@ -494,20 +488,6 @@ class Interval(_Meta):
     def base(self):
         """The base interval given for the interval (str)"""
         return self.__base
-
-    @property
-    def direction(self):
-        """The direction given for the interval ('a' ascending, 'd' descending)"""
-        return self.__direction
-    
-    @direction.setter
-    def direction(self,value):
-        if value != None:
-            if type(value) is not str:
-                raise ValueError(Interval.__dir_err)
-            if value != "a" and value != "d":
-                raise ValueError(Interval.__dir_err)
-        self.__direction = value
     
     @property
     def displace(self):
@@ -614,11 +594,9 @@ class Interval(_Meta):
         if note_obj2.hard_pitch > note_obj1.hard_pitch:
             higher = note_obj2
             lower = note_obj1
-            direction = 'a'
         else:
             higher = note_obj1
             lower = note_obj2
-            direction = 'b'
 
         letter_diff = higher.letter - lower.letter
         pitch_diff = higher.hard_pitch - lower.hard_pitch
@@ -650,11 +628,171 @@ class Interval(_Meta):
             else:
                 quality = f"aug{offset}" if aug else f"dim{offset}"
         
-        return Interval(quality,base,direction=direction,displace=displace)
+        return Interval(quality,base,displace=displace)
+
+MODES = {
+    "ionian": (2,2,1,2,2,2,1),
+    "major": "ionian1",
+    "dorian": "ionian2",
+    "phrygian": "ionian3",
+    "lydian": "ionian4",
+    "mixolydian": "ionian5",
+    "aeolian": "ionian6",
+    "minor": "ionian6",
+    "locrian": "ionian7",
+    "major pentatonic": (2,2,3,2,3),
+    "minor pentatonic": "major pentatonic5",
+    "major blues": (2,1,1,3,2,3),
+    "minor blues": "major blues6",
+    "blues": "major blues6",
+    "harmonic minor": (2,1,2,2,1,3),
+    "melodic minor": (2,1,2,2,2,2,1),
+    "dorian flat 2": "melodic minor2",
+    "lydian sharp 5": "melodic minor3",
+    "lydian dominant": "melodic minor4",
+    "mixolydian flat 6": "melodic minor5",
+    "locrian sharp 2": "melodic minor6",
+    "super locrian": "melodic minor7",
+    "altered": "melodic minor7",
+    "chromatic": (1,1,1,1,1,1,1,1,1,1,1),
+    "whole tone": (2,2,2,2,2),
+    "whole-half diminished": (2,1,2,1,2,1,2,1),
+    "half-whole diminished": (1,2,1,2,1,2,1,2),
+    "whole-half octatonic": "whole-half diminished1",
+    "half-whole octatonic": "half-whole diminished1",
+    "augmented": (3,1,3,1,3,1),
+}
+
+MODE_LETTER_SPELLINGS = {
+    "ionian": (1,1,1,1,1,1,1),
+    "major pentatonic": (1,1,2,1,2),
+    "major blues": (1,0,1,2,1,2),
+    "harmonic minor": (1,1,1,1,1,1,1),
+    "melodic minor": (1,1,1,1,1,1,1),
+    "augmented": (2,0,2,0,2,1),
+}
+
+class Mode(_Meta):
+
+    """
+    | Create a Mode
+    | Use a Note object for the 'root' and a string for the 'mode'.
+    | Check the MODES dictionary.  The keys are built-in mode names.
+    | You can add a mode to the MODES dictionary by using its name for a key and a tuple of integers for step-lengths for its spelling.
+    | It is generally encouraged to add a letter spelling for a new mode to MODE_LETTER_SPELLINGS with the same name as a key.
+    | Use a tuple of integers that describes how many alphabetical letters increase for each scale degree.
+    """
+
+    def __init__(self,root,mode):
+
+        try:
+            assert root.class_name == "Note"
+        except:
+            raise ValueError("Root of a Mode must be a Note object.")
+        if mode not in MODES:
+            raise KeyError("Mode not found.  View the MODES dictionary to see/add modes.")
+
+        self.root = root
+        self.mode = mode
+
+        self._lock()
+    
+    @property
+    def name(self):
+        """Returns a string describing the Mode"""
+        return self.root.note_name + " " + self.mode
+    
+    @property
+    def spelling(self):
+        """A tuple of Note objects that spell the Mode"""
+        spelling = [self.root]
+
+        if type(MODES[self.mode]) is str:
+            parent_name = MODES[self.mode][:len(MODES[self.mode])-1]
+            offset = int(MODES[self.mode][-1]) - 1
+        elif type(MODES[self.mode]) is tuple:
+            parent_name = self.mode
+            offset = 0
+        else:
+            raise ValueError("Invalid Mode pattern. (Check MODES dictionary)")
+        parent = MODES[parent_name]
+        for item in parent:
+            if type(item) is not int:
+                raise ValueError("Invalid Mode pattern. (Check MODES dictionary)")
+        
+        next_pitch = self.root.pitch
+        next_letter = self.root.letter
+        index = offset
+        n = 1
+        if parent_name in MODE_LETTER_SPELLINGS:
+            for step in parent:
+                if index == len(parent):
+                    index -= len(parent)
+                if n == len(parent):
+                    break
+                next_pitch += parent[index]
+                next_letter += MODE_LETTER_SPELLINGS[parent_name][index]
+                if next_pitch < 0:
+                    next_pitch += 12
+                elif next_pitch > 11:
+                    next_pitch -= 12
+                if next_letter < 0:
+                    next_letter += 7
+                elif next_letter > 6:
+                    next_letter -= 7
+                spelling.append(Note.from_values(next_letter,next_pitch))
+                index += 1
+                n += 1
+        else:
+            flats = False if "b" not in self.root.note_name else True
+            sharps = False if "#" not in self.root.note_name else True
+            for step in parent:
+                if index == len(parent):
+                    index -= len(parent)
+                if n == len(parent):
+                    break
+                next_pitch += parent[index]
+                next_letter += 1
+                if next_pitch < 0:
+                    next_pitch += 12
+                elif next_pitch > 11:
+                    next_pitch -= 12
+                if next_letter < 0:
+                    next_letter += 7
+                elif next_letter > 6:
+                    next_letter -= 7
+                next_note = Note.from_values(next_letter,next_pitch)
+                if len(next_note.note_name) > 2:
+                    next_note = next_note.enharmonic()
+                if next_note.note_name in ("B#","Cb","E#","Fb"):
+                    next_note = next_note.enharmonic()
+                if "#" in next_note.note_name:
+                    if flats:
+                        next_note = next_note.enharmonic()
+                    if not flats and not sharps:
+                        sharps = True
+                if "b" in next_note.note_name:
+                    if sharps:
+                        next_note = next_note.enharmonic()
+                    if not flats and not sharps:
+                        flats = True
+                index += 1
+                n += 1
+                spelling.append(next_note)
+                
+        return tuple(spelling)
+    
+    @property
+    def string_spelling(self):
+        """A tuple of note names as strings"""
+        string_spelling = []
+
+        for note in self.spelling:
+            string_spelling.append(note.note_name)
+        
+        return tuple(string_spelling)
 
 
-
-
-
+class Chord(_Meta):
 
 
