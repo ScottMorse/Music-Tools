@@ -1049,7 +1049,7 @@ class Chord(_Meta):
 
     @property
     def dictionary(self):
-        """A dictionary of chord tones and their respective Intervals."""
+        """A dictionary of chord tones and their respective Interval objects."""
         return self._dictionary
     
     @property
