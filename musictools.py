@@ -925,7 +925,7 @@ class Chord(_Meta):
     | Create a Chord from a root Note, quality, and extensions.
     | Pass extensions (str) as args.  Check out EXTENSIONS's keys for valid input.
     | For 'quality', use 'maj','min','aug','dim','sus',or '5'.
-    | Keep in mind that some extensions imply and automatically add others (like 13).
+    | Keep in mind that some extensions imply and automatically add others (like '13').
     | Uncommon, strange, repetitious, or ridiculous combinations of extensions might not work as expected.
     """
 
