@@ -821,6 +821,8 @@ class Mode(_Meta):
         next_letter = self.root.letter
         index = offset
         n = 1
+        flats = False if "b" not in self.root.note_name else True
+        sharps = False if "#" not in self.root.note_name else True
         if parent_name in MODE_LETTER_SPELLINGS:
             for step in parent:
                 if index == len(parent):
@@ -828,7 +830,10 @@ class Mode(_Meta):
                 if n == len(parent):
                     break
                 next_pitch += parent[index]
-                next_letter += MODE_LETTER_SPELLINGS[parent_name][index]
+                if parent_name in MODE_LETTER_SPELLINGS:
+                    next_letter += MODE_LETTER_SPELLINGS[parent_name][index]
+                else:
+                    next_letter += 1
                 if next_pitch < 0:
                     next_pitch += 12
                 elif next_pitch > 11:
@@ -837,7 +842,25 @@ class Mode(_Meta):
                     next_letter += 7
                 elif next_letter > 6:
                     next_letter -= 7
-                spelling.append(Note.from_values(next_letter,next_pitch))
+                if parent_name in MODE_LETTER_SPELLINGS:
+                    next_note = Note.from_values(next_letter,next_pitch)
+                else:
+                    next_note = Note.from_values(next_letter,next_pitch)
+                    if len(next_note.note_name) > 2:
+                        next_note = next_note.enharmonic()
+                    if next_note.note_name in ("B#","Cb","E#","Fb"):
+                        next_note = next_note.enharmonic()
+                    if "#" in next_note.note_name:
+                        if flats:
+                            next_note = next_note.enharmonic()
+                        if not flats and not sharps:
+                            sharps = True
+                    if "b" in next_note.note_name:
+                        if sharps:
+                            next_note = next_note.enharmonic()
+                        if not flats and not sharps:
+                            flats = True
+                spelling.append(next_note)
                 index += 1
                 n += 1
         else:
