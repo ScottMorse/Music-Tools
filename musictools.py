@@ -169,7 +169,7 @@ class Note(_Meta):
         | Returns an object with three properties: name, size, and value
         |
         | .rhythm.name is a string describing the rhythm
-        | .rhythm.size is a number that measures the rhythm in 512th notes
+        | .rhythm.length is a number that measures the rhythm in 512th notes
         | .rhythm.value is the original integer used to set the rhythm
         | 
         | .rhtyhm.size does take into account dot and triplet settings.
@@ -188,7 +188,7 @@ class Note(_Meta):
         if self.triplet:
             __rhy_name += " triplet"
             __rhy_size *= (2/3)
-        return type('obj', (object,), {'name': __rhy_name, 'size': __rhy_size, 'value': self.__rhythm})
+        return type('obj', (object,), {'name': __rhy_name, 'length': __rhy_size, 'value': self.__rhythm})
 
     @rhythm.setter
     def rhythm(self,value):
@@ -365,18 +365,8 @@ class Note(_Meta):
         new_note.triplet = self.triplet
         
         return new_note
-
-    @classmethod
-    def sorter_by_hard_pitch(self,note_object):
-        """
-        | A function that can be used for in a sort function.
-        | Cannot be used for Notes with no octave values.
-        """
-        if note_object.octave == None:
-            raise ValueError("Can't sort Notes without octave values by hard pitch.")
-        return note_object.hard_pitch
     
-    def sorter_from_root(self,note_object):
+    def sort_from_root(self,note_object):
         """
         | A function that can be used for in a sort function.
         | Used as a method from a specific object to act as the root.
@@ -495,12 +485,12 @@ class Note(_Meta):
             index += 1
     
     @classmethod
-    def from_frequency(self,Hz):
+    def from_frequency(self,Hz,prefer_flat=False):
         if type(Hz) is not int and type(Hz) is not float:
             raise ValueError("Please provide a positive number for the Hz value.")
         if Hz <= 0:
             raise ValueError("Please provide a positive number for the Hz value.")
-        return Note.from_hard_pitch(int(round(12 * (log2(Hz) - log2(get_A4()))) + 57))
+        return Note.from_hard_pitch(int(round(12 * (log2(Hz) - log2(get_A4()))) + 57),prefer_flat=prefer_flat)
     
 class Interval(_Meta):
 
@@ -1040,7 +1030,7 @@ class Chord(_Meta):
             notes.append(note)
         
 
-        notes.sort(key=root.sorter_from_root)
+        notes.sort(key=root.sort_from_root)
         previous_note = root
         first = True
         for note in notes:
@@ -1079,3 +1069,6 @@ class Chord(_Meta):
     def notes(self):
         """A tuple containing all the Note objects of the Chord."""
         return self._notes
+    
+
+print(Note("Dbbb").enharmonic().note_name)
