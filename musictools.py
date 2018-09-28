@@ -9,10 +9,14 @@ def get_A4():
     return __A4
 
 def set_A4(Hz):
+    err = 'Hz value for A4 must be a positive number.'
+
     if type(Hz) is not int and type(Hz) is not float:
-        raise ValueError('Hz value for A4 must be a positive number.')
+        raise ValueError(err)
+
     if Hz <= 0:
-        raise ValueError('Hz value for A4 must be a positive number.')
+        raise ValueError(err)
+
     global __A4
     __A4 = Hz
 
@@ -22,7 +26,10 @@ class _Meta:
         "enharmonic",
     )
     def __setattr__(self, name, value):
-        if self.__locked and name not in dir(self) or name in _Meta.__RESTRICTED or name.startswith("__"):
+        if (self.__locked 
+                and name not in dir(self) 
+                or name in _Meta.__RESTRICTED 
+                or name.startswith("__")):
             raise AttributeError(f"Cannot set attribute '{name}'.")
         object.__setattr__(self, name, value)
 
@@ -49,17 +56,17 @@ class Note(_Meta):
     class_name = "Note"
 
     RHYTHM_SETTER_VALUES = """
-    Double whole: 0
-    Whole: 1
-    Half: 2
-    Quarter: 3
-    8th: 4
-    16th: 5
-    32nd: 6
-    64th: 7
-    128th: 8
-    256th: 9
-    512th: 10
+        Double whole: 0
+        Whole: 1
+        Half: 2
+        Quarter: 3
+        8th: 4
+        16th: 5
+        32nd: 6
+        64th: 7
+        128th: 8
+        256th: 9
+        512th: 10
     """
 
     __RHYTHM_VALUES = (
@@ -77,32 +84,37 @@ class Note(_Meta):
     )
 
     __PITCH_VALUES = (
-        ("C",0),
-        ("D",2),
-        ("E",4),
-        ("F",5),
-        ("G",7),
-        ("A",9),
+        ("C",0),("D",2),
+        ("E",4),("F",5),
+        ("G",7),("A",9),
         ("B",11),
     )
 
     __NOTE_REGEX = r'[A-G](#|b)*$'
 
     def __init__(self,name,octave=None,rhythm=0,dots=0,triplet=False):
+
         if type(name) is not str:
             raise ValueError('Note name must be a string.')
+
         name = name.strip().capitalize()
+
         if not match(Note.__NOTE_REGEX,name) and name != "R":
             raise ValueError('Invalid note name.')
+
         if octave != None:
             if type(octave) is not int:
                 raise ValueError('Octave value must be an integer.')
+
         if rhythm not in range(11):
             raise ValueError('Rhythm value must be an integer between 0 and 10. See Note.RHYTHM_SETTER_VALUES')
+
         if type(dots) is not int:
             raise ValueError('Dot value must be a positive integer or 0.')
+
         if dots < 0:
             raise ValueError('Dot value must be a positive integer or 0.')
+
         if type(triplet) is not bool:
             raise ValueError('Triplet value must be Boolean.')
 
@@ -143,10 +155,11 @@ class Note(_Meta):
     
     @dots.setter
     def dots(self,value):
+        err = "Dot value must be a positive integer or 0."
         if type(value) is not int:
-            raise ValueError("Dot value must be a positive integer or 0.")
+            raise ValueError(err)
         if value < 0:
-            raise ValueError("Dot value must be a positive integer or 0.")
+            raise ValueError(err)
         self.__dots = value
 
     @property
@@ -207,7 +220,7 @@ class Note(_Meta):
                 name += str(self.octave)
             if self.rhythm:
                 name += " " + self.rhythm.name
-        return name
+            return name
     
     @property
     def note_name(self):
@@ -389,12 +402,12 @@ class Note(_Meta):
             letter -= 7
 
         if self.octave:
-            pitch = self.hard_pitch + interval.difference
+            pitch = self.hard_pitch + interval.pitch_difference
             new_note = Note.from_hard_pitch(pitch)
             if new_note.letter != letter:
                 new_note = new_note.enharmonic()
         else:
-            pitch = self.pitch + interval.difference
+            pitch = self.pitch + interval.pitch_difference
             if interval.displace > 0:
                 pitch -= interval.displace * 12
             if pitch > 11:
@@ -420,12 +433,12 @@ class Note(_Meta):
             letter += 7
 
         if self.octave:
-            pitch = self.hard_pitch - interval.difference
+            pitch = self.hard_pitch - interval.pitch_difference
             new_note = Note.from_hard_pitch(pitch)
             if new_note.letter != letter:
                 new_note = new_note.enharmonic()
         else:
-            pitch = self.pitch - interval.difference
+            pitch = self.pitch - interval.pitch_difference
             if interval.displace > 0:
                 pitch -= interval.displace * 12
             if pitch < 0:
@@ -480,6 +493,8 @@ class Note(_Meta):
                 return Note(note[0],octave=octave)
             if pitch == note[1] + 1:
                 if prefer_flat:
+                    if i == 6:
+                        i = -1
                     return Note(Note.__PITCH_VALUES[index + 1][0] + "b",octave=octave)
                 return Note(note[0] + "#",octave=octave)
             index += 1
@@ -509,15 +524,16 @@ class Interval(_Meta):
 
     class_name = "Interval"
 
-    BASES = ("uni", "2nd", "3rd", "4th", "5th", "6th", "7th")
+    BASES = (
+        "uni", "2nd", "3rd", 
+        "4th", "5th", "6th", 
+        "7th",
+    )
 
     __BASE_INTERVALS = {
-        "uni": (0,),
-        "2nd": (1,2),
-        "3rd": (3,4),
-        "4th": (5,),
-        "5th": (7,),
-        "6th": (8,9),
+        "uni": (0,), "2nd": (1,2),
+        "3rd": (3,4), "4th": (5,),
+        "5th": (7,), "6th": (8,9),
         "7th": (10,11),
     }
 
@@ -526,7 +542,11 @@ class Interval(_Meta):
     __QUALITY_REGEX = r'(maj|min|per)$|(aug|dim)[\d]*$'
 
     __base_err = "Base interval must be a valid string. (see Interval.BASES)"
-    __quality_err = "Quality must be 'maj','min','per','aug', or 'dim'.\n Augmented and diminished intervals may be increased by adding an integer, such as 'aug2' for doubly augmented."
+    __quality_err = (
+        "Quality must be 'maj','min','per','aug', or 'dim'."
+        "\n Augmented and diminished intervals may be increased by adding an integer,"
+         "such as 'aug2' for doubly augmented."
+         )
     __base_qual_err1 = "2nd/3rd/6th/7th cannot be perfect."
     __base_qual_err2 = "uni/4th/5th cannot be major or minor."
     __dis_err = "Displacement of octave must be a positive integer."
@@ -560,21 +580,21 @@ class Interval(_Meta):
 
     @property
     def quality(self):
-        """The quality given for the interval (str)"""
+        """The quality originally given for the interval (str)"""
         return self.__quality
 
     @property
     def base(self):
-        """The base interval given for the interval (str)"""
+        """The base interval originally given for the interval (str)"""
         return self.__base
     
     @property
     def displace(self):
-        """The given number of octaves displaced (int)"""
+        """The orignal given number of octaves displaced (int)"""
         return self.__displace
 
     @property
-    def difference(self):
+    def pitch_difference(self):
         """Returns the difference in pitch of the interval measured in half steps (int)"""
         if self.quality == "per" or self.quality == "min":
             return Interval.__BASE_INTERVALS[self.base][0] + 12 * self.displace
@@ -636,20 +656,15 @@ class Interval(_Meta):
         return name
         
     __SIMPLE_INTVLS = (
-        ("per","uni"),
-        ("min","2nd"),
-        ("maj","2nd"),
-        ("min","3rd"),
-        ("maj","3rd"),
-        ("per","4th"),
-        ("aug","4th"),
-        ("per","5th"),
-        ("min","6th"),
-        ("maj","6th"),
-        ("min","7th"),
-        ("maj","7th"),
+        ("per","uni"),("min","2nd"),
+        ("maj","2nd"),("min","3rd"),
+        ("maj","3rd"),("per","4th"),
+        ("aug","4th"),("per","5th"),
+        ("min","6th"),("maj","6th"),
+        ("min","7th"),("maj","7th"),
         )
     
+    #A way to create an Interval by measuring the distance between two Note objects
     @classmethod
     def from_notes(self,note_obj1,note_obj2,simple=None):
         """
@@ -763,7 +778,7 @@ class Mode(_Meta):
 
     """
     | Create a Mode
-    | Use a Note object for the 'root' and a string for the 'mode'.
+    | Use a Note object or a note name (string) for the 'root' and a string for the 'mode'.
     | Check the MODES dictionary.  The keys are built-in mode names.
     | You can add a mode to the MODES dictionary by using its name for a key and a tuple of integers for step-lengths for its spelling.
     | It is generally encouraged to add a letter spelling for a new mode to MODE_LETTER_SPELLINGS with the same name as a key.
@@ -771,15 +786,17 @@ class Mode(_Meta):
     """
 
     def __init__(self,root,mode):
+        
+        if type(root) is Note:
+            self.root = root
+        elif match(Note._Note__NOTE_REGEX,root):
+            self.root = Note(root)
+        else:
+            raise ValueError("Root of a Mode must be a Note object or note name.")
 
-        try:
-            assert root.class_name == "Note"
-        except:
-            raise ValueError("Root of a Mode must be a Note object.")
         if mode not in MODES:
             raise KeyError("Mode not found.  View the MODES dictionary to see/add modes.")
 
-        self.root = root
         self.mode = mode
 
         self._lock()
@@ -891,16 +908,16 @@ class Mode(_Meta):
                 spelling.append(next_note)
                 
         return tuple(spelling)
-    
-    @property
-    def string_spelling(self):
-        """A tuple of note names as strings"""
-        string_spelling = []
 
-        for note in self.spelling:
-            string_spelling.append(note.note_name)
+    #A Mode is iterable based on the spelling of it's Note objects
+    def __iter__(self):
+        return iter(self.spelling)
         
-        return tuple(string_spelling)
+    #end of Mode class
+
+Amajor = Mode("A","major")
+for note in Amajor:
+    print(note.note_name)
 
 EXTENSIONS = {
     "b9": ("min","2nd"),
@@ -924,12 +941,8 @@ EXTENSIONS = {
 }
 
 QUALITIES = (
-    "maj",
-    "min",
-    "aug",
-    "dim",
-    "sus",
-    "5",
+    "maj","min","aug",
+    "dim","sus","5",
 )
 
 class Chord(_Meta):
@@ -1069,6 +1082,5 @@ class Chord(_Meta):
     def notes(self):
         """A tuple containing all the Note objects of the Chord."""
         return self._notes
-    
 
-print(Note("Dbbb").enharmonic().note_name)
+    
